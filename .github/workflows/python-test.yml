@@ -1,3 +1,4 @@
+# CI validation workflow
 name: Python Tests
 
 on:
@@ -22,11 +23,9 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-
       - name: Install testing tools
         run: |
           pip install pytest pytest-cov
-
       - name: Run tests
         env:
           PYTHONPATH: .
