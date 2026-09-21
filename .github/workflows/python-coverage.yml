@@ -20,7 +20,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.13'
           cache: 'pip'
 
       - name: Install Dependencies and Coverage Tools
@@ -31,9 +31,10 @@ jobs:
 
       - name: Run Tests with Coverage
         env:
-          PYTHONPATH: .
+          PYTHONPATH: .:src
         run: |
-          python -m pytest --verbose --cov=src --cov-fail-under=60 --junitxml=pytest.xml --cov-report=term-missing | tee pytest-coverage.txt
+          set -o pipefail
+          python -m pytest --verbose --cov=src --cov-fail-under=90 --junitxml=pytest.xml --cov-report=term-missing | tee pytest-coverage.txt
 
       - name: Publish Coverage Comment
         uses: MishaKav/pytest-coverage-comment@v3

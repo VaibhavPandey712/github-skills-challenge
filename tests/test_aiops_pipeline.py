@@ -1,3 +1,5 @@
+import json
+import runpy
 from pathlib import Path
 
 from src.anomaly_detector import AnomalyDetector
@@ -42,6 +44,27 @@ def test_anomalous_record_is_detected():
     assert event["type"] == "ANOMALY"
 
 
+def test_cpu_and_memory_anomalies_are_reported():
+    detector = AnomalyDetector()
+
+    record = {
+        "timestamp": "2026-09-20T10:05:00",
+        "service": "payment-service",
+        "response_time_ms": 120,
+        "cpu_percent": 81,
+        "memory_percent": 81,
+        "log_level": "INFO",
+        "message": "Resource utilization is high"
+    }
+
+    event = detector.detect(record)
+
+    assert event["reasons"] == [
+        "High CPU utilization",
+        "High memory utilization"
+    ]
+
+
 def test_producer_publishes_event():
     topic = EventTopic("anomaly-events")
     producer = EventProducer(topic)
@@ -53,6 +76,14 @@ def test_producer_publishes_event():
 
     assert producer.publish(event)
     assert len(topic.get_messages()) == 1
+
+
+def test_producer_rejects_empty_event():
+    topic = EventTopic("anomaly-events")
+    producer = EventProducer(topic)
+
+    assert producer.publish(None) is False
+    assert topic.get_messages() == []
 
 
 def test_consumer_receives_event():
@@ -70,3 +101,54 @@ def test_consumer_receives_event():
     messages = consumer.consume()
 
     assert len(messages) == 1
+
+
+def test_topic_clear_removes_messages():
+    topic = EventTopic("anomaly-events")
+    topic.publish({"type": "ANOMALY"})
+
+    topic.clear()
+
+    assert topic.get_messages() == []
+
+
+def test_run_pipeline_processes_service_data(tmp_path):
+    input_path = tmp_path / "service_data.json"
+    input_path.write_text(json.dumps([
+        {
+            "timestamp": "2026-09-20T10:00:00",
+            "service": "payment-service",
+            "response_time_ms": 100,
+            "cpu_percent": 40,
+            "memory_percent": 50,
+            "log_level": "INFO",
+            "message": "Healthy request"
+        },
+        {
+            "timestamp": "2026-09-20T10:01:00",
+            "service": "payment-service",
+            "response_time_ms": 600,
+            "cpu_percent": 40,
+            "memory_percent": 50,
+            "log_level": "ERROR",
+            "message": "Request failed"
+        }
+    ]), encoding="utf-8")
+
+    result = run_pipeline(str(input_path))
+
+    assert result["records_processed"] == 2
+    assert len(result["anomalies_detected"]) == 1
+    assert result["events_consumed"] == result["anomalies_detected"]
+
+
+def test_pipeline_script_prints_summary(capsys, monkeypatch):
+    project_root = Path(__file__).resolve().parents[1]
+    monkeypatch.chdir(project_root)
+
+    runpy.run_path(str(project_root / "src" / "aiops_pipeline.py"), run_name="__main__")
+
+    output = capsys.readouterr().out
+    assert "AIOps Pipeline Result" in output
+    assert "Records processed: 10" in output
+    assert "Anomalies detected: 2" in output
