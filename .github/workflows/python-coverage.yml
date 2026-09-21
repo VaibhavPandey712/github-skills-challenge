@@ -37,7 +37,7 @@ jobs:
           python -m pytest --verbose --cov=src --cov-fail-under=90 --junitxml=pytest.xml --cov-report=term-missing | tee pytest-coverage.txt
 
       - name: Publish Coverage Comment
-        uses: MishaKav/pytest-coverage-comment@v3
+        uses: MishaKav/pytest-coverage-comment@v1.12.2
         with:
           github-token: ${{ github.token }}
           pytest-coverage-path: ./pytest-coverage.txt
